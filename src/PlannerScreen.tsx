@@ -66,7 +66,7 @@ function PitchSlotNode({ slot, assignedPlayer, isSelected, onClick, isCustomMode
         disabled: (!assignedPlayer && !isCustomMode)
     });
 
-    const { attributes: moveAttrs, listeners: moveListeners, setNodeRef: setMoveDraggableRef } = useDraggable({
+    const { attributes: moveAttrs, listeners: moveListeners, setNodeRef: setMoveDraggableRef, transform: moveTransform } = useDraggable({
         id: `move-slot-${slot.id}`,
         data: { source: 'move-slot', slotId: slot.id }
     });
@@ -80,9 +80,9 @@ function PitchSlotNode({ slot, assignedPlayer, isSelected, onClick, isCustomMode
         position: 'absolute',
         left: `${customPos.x}%`,
         top: `${customPos.y}%`,
-        transform: `translate(-50%, -50%)`,
+        transform: `translate(-50%, -50%) ${moveTransform ? `translate3d(${moveTransform.x}px, ${moveTransform.y}px, 0)` : ''}`,
         opacity: isDragging ? 0.5 : 1,
-        zIndex: isDragging ? 10 : 1
+        zIndex: (isDragging || moveTransform) ? 10 : 1
     };
 
     return (
@@ -182,6 +182,9 @@ export function PlannerScreen({ players, quarters, onQuarterUpdate }: PlannerScr
         setActiveDragData(event.active.data.current);
     };
 
+    const slots = formations[currentQuarter.formation];
+    const assignedPlayerIds = Object.values(currentQuarter.assignments);
+
     const handleDragEnd = (event: DragEndEvent) => {
         setActiveDragData(null);
         const { active, over } = event;
@@ -240,8 +243,7 @@ export function PlannerScreen({ players, quarters, onQuarterUpdate }: PlannerScr
         }
     };
 
-    const slots = formations[currentQuarter.formation];
-    const assignedPlayerIds = Object.values(currentQuarter.assignments);
+
 
     const POSITIONS: Position[] = ['GK', 'DF', 'MF', 'FW', 'Unassigned'];
 
@@ -327,7 +329,7 @@ export function PlannerScreen({ players, quarters, onQuarterUpdate }: PlannerScr
                 </div>
 
                 <DragOverlay dropAnimation={null}>
-                    {activeDragData ? (
+                    {activeDragData && activeDragData.player ? (
                         <div className="player-card" style={{ padding: '0.5rem 1rem', background: 'var(--primary)', color: 'white', borderRadius: 8, transform: 'scale(1.05)', whiteSpace: 'nowrap' }}>
                             {activeDragData.player.name}
                         </div>
