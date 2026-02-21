@@ -1,5 +1,6 @@
+import React, { useState } from 'react';
 import type { Player, Position } from './types';
-import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
@@ -12,7 +13,7 @@ interface PositionCategorizerProps {
 
 const POSITIONS: Position[] = ['Unassigned', 'GK', 'DF', 'MF', 'FW'];
 
-function DraggablePlayerCard({ player }: { player: Player }) {
+function DraggablePlayerCard({ player, onClick }: { player: Player; onClick: (e: React.MouseEvent) => void }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: player.id,
         data: { player }
@@ -20,6 +21,7 @@ function DraggablePlayerCard({ player }: { player: Player }) {
 
     const style = {
         transform: CSS.Translate.toString(transform),
+        cursor: 'pointer'
     };
 
     return (
@@ -27,6 +29,7 @@ function DraggablePlayerCard({ player }: { player: Player }) {
             ref={setNodeRef}
             style={style}
             className={`player-card ${isDragging ? 'is-dragging' : ''}`}
+            onClick={onClick}
             {...attributes}
             {...listeners}
         >
@@ -36,7 +39,7 @@ function DraggablePlayerCard({ player }: { player: Player }) {
     );
 }
 
-function Column({ position, players }: { position: Position; players: Player[] }) {
+function Column({ position, players, isSelected, onClick, onPlayerClick }: { position: Position; players: Player[]; isSelected: boolean; onClick: () => void; onPlayerClick: (p: Player) => void }) {
     const { setNodeRef, isOver } = useDroppable({
         id: `column-${position}`,
         data: { position }
@@ -45,15 +48,23 @@ function Column({ position, players }: { position: Position; players: Player[] }
     return (
         <div
             ref={setNodeRef}
-            className="glass-panel position-column"
-            style={{ borderColor: isOver ? 'var(--primary)' : 'var(--panel-border)' }}
+            className={`glass-panel position-column ${isSelected ? 'selected' : ''}`}
+            style={{
+                borderColor: isSelected ? 'var(--primary)' : (isOver ? 'var(--primary)' : 'var(--panel-border)'),
+                boxShadow: isSelected ? '0 0 0 2px var(--primary)' : undefined,
+                cursor: position !== 'Unassigned' ? 'pointer' : 'default'
+            }}
+            onClick={onClick}
         >
             <div className={`column-header tag-${position.toLowerCase()}`}>
                 {position} ({players.length})
             </div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: '100px' }}>
                 {players.map((p) => (
-                    <DraggablePlayerCard key={p.id} player={p} />
+                    <DraggablePlayerCard key={p.id} player={p} onClick={(e) => {
+                        e.stopPropagation();
+                        onPlayerClick(p);
+                    }} />
                 ))}
                 {players.length === 0 && (
                     <div style={{ padding: '1rem', textAlign: 'center', opacity: 0.5, fontSize: '0.9rem' }}>
@@ -66,6 +77,16 @@ function Column({ position, players }: { position: Position; players: Player[] }
 }
 
 export function PositionCategorizer({ players, onPlayerMoved, onContinue }: PositionCategorizerProps) {
+    const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5,
+            }
+        })
+    );
+
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over) return;
@@ -78,6 +99,22 @@ export function PositionCategorizer({ players, onPlayerMoved, onContinue }: Posi
         }
     };
 
+    const handleColumnClick = (pos: Position) => {
+        if (pos === 'Unassigned') {
+            setSelectedPosition(null);
+            return;
+        }
+        setSelectedPosition(prev => prev === pos ? null : pos);
+    };
+
+    const handlePlayerClick = (p: Player) => {
+        if (p.position !== 'Unassigned') {
+            onPlayerMoved(p.id, 'Unassigned');
+        } else if (selectedPosition) {
+            onPlayerMoved(p.id, selectedPosition);
+        }
+    };
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -87,10 +124,17 @@ export function PositionCategorizer({ players, onPlayerMoved, onContinue }: Posi
                 </button>
             </div>
 
-            <DndContext onDragEnd={handleDragEnd}>
+            <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
                 <div className="categorizer-grid">
                     {POSITIONS.map((pos) => (
-                        <Column key={pos} position={pos} players={players.filter((p) => p.position === pos)} />
+                        <Column
+                            key={pos}
+                            position={pos}
+                            players={players.filter((p) => p.position === pos)}
+                            isSelected={selectedPosition === pos}
+                            onClick={() => handleColumnClick(pos)}
+                            onPlayerClick={handlePlayerClick}
+                        />
                     ))}
                 </div>
             </DndContext>

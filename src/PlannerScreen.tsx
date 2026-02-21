@@ -151,6 +151,16 @@ export function PlannerScreen({ players, quarters, onQuarterUpdate }: PlannerScr
     };
 
     const handleSlotClick = (slotId: string) => {
+        const newAssignments = { ...currentQuarter.assignments };
+        if (newAssignments[slotId]) {
+            delete newAssignments[slotId];
+            onQuarterUpdate(activeQuarterId, { assignments: newAssignments });
+            if (selectedSlotId === slotId) {
+                setSelectedSlotId(null);
+            }
+            return;
+        }
+
         setSelectedSlotId(prev => prev === slotId ? null : slotId);
     };
 
@@ -253,7 +263,25 @@ export function PlannerScreen({ players, quarters, onQuarterUpdate }: PlannerScr
                 {/* Sidebar */}
                 <div className="glass-panel planner-sidebar" ref={setSidebarDroppableRef}>
                     <div>
-                        <h3 style={{ marginBottom: '0.5rem' }}>Quarters</h3>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>
+                            <h3 style={{ margin: 0 }}>Quarters</h3>
+                            {activeQuarterId > 0 && (
+                                <button
+                                    className="btn"
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                                    onClick={() => {
+                                        const prevQuarter = quarters[activeQuarterId - 1];
+                                        onQuarterUpdate(activeQuarterId, {
+                                            formation: prevQuarter.formation,
+                                            assignments: { ...prevQuarter.assignments },
+                                            customCoordinates: prevQuarter.customCoordinates ? { ...prevQuarter.customCoordinates } : undefined
+                                        });
+                                    }}
+                                >
+                                    Keep last block
+                                </button>
+                            )}
+                        </div>
                         <div className="quarter-tabs">
                             {quarters.map((_, idx) => (
                                 <div
